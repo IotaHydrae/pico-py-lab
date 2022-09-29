@@ -2,8 +2,14 @@ import time
 
 from machine import Pin, I2C
 
+"""
+Device addr of ADXL345
+"""
 ADXL345_ADDR = 83
 
+"""
+Register Map
+"""
 ADXL345_REG_DEVID = 0x00
 # 0x01 ~ 0x1c reserved
 ADXL345_REG_THRESH_TAP = 0x1d
@@ -36,6 +42,18 @@ ADXL345_REG_DATAZ1 = 0x37
 ADXL345_REG_FIFO_CTL = 0x38
 ADXL345_REG_FIFO_STATUS = 0x39
 
+"""
+Bit Masks
+"""
+ADXL345_INT_ENABLE_DATA_READY = (1 << 7)
+ADXL345_INT_ENABLE_SINGLE_TAP = (1 << 6)
+ADXL345_INT_ENABLE_DOUBLE_TAP = (1 << 5)
+ADXL345_INT_ENABLE_ACTIVITY = (1 << 4)
+ADXL345_INT_ENABLE_INACTIVITY = (1 << 3)
+ADXL345_INT_ENABLE_FREE_FALL = (1 << 2)
+ADXL345_INT_ENABLE_WATERMARK = (1 << 1)
+ADXL345_INT_ENABLE_ACTIVITY_TAP = (1 << 0)
+
 
 class i2c_ifce(object):
     def __init__(self, ifce=0, scl=5, sda=4, freq=100000):
@@ -49,7 +67,7 @@ class i2c_ifce(object):
 
     def write_byte_data(self, addr, byte, data):
         # print("dump:", data.to_bytes(1, 'little'))
-        self.i2c.writeto_mem(addr, byte, data.to_bytes(1, 'little'))
+        self.i2c.writeto_mem(addr, byte, data)
 
     def write_byte(self, addr, byte):
         self.i2c.writeto(addr, byte)
@@ -73,7 +91,28 @@ class adxl345(i2c_ifce):
         super().__init__()
 
         # initialize adxl345's power control reg
-        super().write_byte_data(self.dev_addr, ADXL345_REG_POWER_CTL, 0)
+        self.init_sequence()
+
+    def i2c_read(self, reg):
+        return super().read_byte_data(self.dev_addr, reg)
+
+    def i2c_write(self, reg, val):
+        super().write_byte_data(self.dev_addr, reg, val)
+
+    def init_sequence(self):
+        # Enable measure
+        power_ctl = self.i2c_read(ADXL345_REG_POWER_CTL)
+        self.i2c_write(ADXL345_REG_POWER_CTL, power_ctl | (1 << 3))
+
+        # Enable single tap interrupt
+        int_enable = self.i2c_read(ADXL345_REG_INT_ENABLE)
+        self.i2c_write(ADXL345_REG_INT_ENABLE,
+                       int_enable |
+                       ADXL345_INT_ENABLE_DATA_READY |
+                       ADXL345_INT_ENABLE_SINGLE_TAP
+                       )
+
+        # Configure FIFO to bypass mode
 
     def read_device_id(self):
         return super().read_byte_data(self.dev_addr, ADXL345_REG_DEVID)
