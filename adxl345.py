@@ -1,5 +1,3 @@
-import time
-
 from machine import Pin, I2C
 
 """
@@ -43,7 +41,7 @@ ADXL345_REG_FIFO_CTL = 0x38
 ADXL345_REG_FIFO_STATUS = 0x39
 
 """
-Bit Masks
+Bit Masks -- Register Interrupt Enable
 """
 ADXL345_INT_ENABLE_DATA_READY = (1 << 7)
 ADXL345_INT_ENABLE_SINGLE_TAP = (1 << 6)
@@ -54,9 +52,21 @@ ADXL345_INT_ENABLE_FREE_FALL = (1 << 2)
 ADXL345_INT_ENABLE_WATERMARK = (1 << 1)
 ADXL345_INT_ENABLE_ACTIVITY_TAP = (1 << 0)
 
+"""
+
+"""
+
+
+def in_hex(func):
+    def wrapper(*args, **kwargs):
+        res = func(*args, **kwargs)
+        return hex(res)
+
+    return wrapper
+
 
 class i2c_ifce(object):
-    def __init__(self, ifce=0, scl=5, sda=4, freq=100000):
+    def __init__(self, ifce=0, scl=5, sda=4, freq=400000):
         self.ifce = ifce
         self.scl = scl
         self.sda = sda
@@ -93,47 +103,102 @@ class adxl345(i2c_ifce):
         # initialize adxl345's power control reg
         self.init_sequence()
 
-    def i2c_read(self, reg):
-        return super().read_byte_data(self.dev_addr, reg)
+    def i2c_read(self, reg) -> int:
+        return int.from_bytes(super().read_byte_data(self.dev_addr, reg), 'little')
 
     def i2c_write(self, reg, val):
+        val = val.to_bytes(1, 'little')
         super().write_byte_data(self.dev_addr, reg, val)
 
     def init_sequence(self):
+        # Clear pctl reg
+        self.i2c_write(ADXL345_REG_POWER_CTL, 0)
         # Enable measure
-        power_ctl = self.i2c_read(ADXL345_REG_POWER_CTL)
+        power_ctl: bytes = self.i2c_read(ADXL345_REG_POWER_CTL)
+        print(power_ctl)
+
         self.i2c_write(ADXL345_REG_POWER_CTL, power_ctl | (1 << 3))
 
         # Enable single tap interrupt
         int_enable = self.i2c_read(ADXL345_REG_INT_ENABLE)
+        print("int_enable:", int_enable)
         self.i2c_write(ADXL345_REG_INT_ENABLE,
                        int_enable |
                        ADXL345_INT_ENABLE_DATA_READY |
                        ADXL345_INT_ENABLE_SINGLE_TAP
                        )
+        # Set Data format, full res +-16g
+        self.i2c_write(ADXL345_REG_DATA_FORMAT, (1 << 3) | 3)
 
-        # Configure FIFO to bypass mode
+        # Configure FIFO to stream mode
+        self.i2c_write(ADXL345_REG_FIFO_CTL, (2 << 6))
+        fifo_ctl = self.i2c_read(ADXL345_REG_FIFO_CTL)
+        print("fifo ctl:", fifo_ctl)
 
-    def read_device_id(self):
-        return super().read_byte_data(self.dev_addr, ADXL345_REG_DEVID)
+    @in_hex
+    def read_device_id(self) -> int:
+        return self.i2c_read(ADXL345_REG_DEVID)
 
     def read_thresh_tap(self):
-        return super().read_byte_data(self.dev_addr, ADXL345_REG_THRESH_TAP)
+        return self.i2c_read(ADXL345_REG_THRESH_TAP)
+
+    def read_int_source(self):
+        return self.i2c_read(ADXL345_REG_INT_SOURCE)
+
+    def read_data_x0(self):
+        return self.i2c_read(ADXL345_REG_DATAX0)
+
+    def read_data_x1(self):
+        return self.i2c_read(ADXL345_REG_DATAX1)
+
+    def read_data_x(self):
+        msb = self.read_data_x1()
+        lsb = self.read_data_x0()
+
+        return lsb if msb <= 0 else lsb - 255
+
+    def read_data_y0(self):
+        return self.i2c_read(ADXL345_REG_DATAY0)
+
+    def read_data_y1(self):
+        return self.i2c_read(ADXL345_REG_DATAY1)
+
+    def read_data_y(self):
+        msb = self.read_data_y1()
+        lsb = self.read_data_y0()
+
+        return lsb if msb <= 0 else lsb - 255
+
+    def read_data_z0(self):
+        return self.i2c_read(ADXL345_REG_DATAZ0)
+
+    def read_data_z1(self):
+        return self.i2c_read(ADXL345_REG_DATAZ1)
+
+    def read_data_z(self):
+        msb = self.read_data_z1()
+        lsb = self.read_data_z0()
+
+        return lsb if msb <= 0 else lsb - 255
 
     def start_measure(self):
-        super().write_byte_data(self.dev_addr, ADXL345_REG_POWER_CTL, 1 << 3)
+        self.i2c_write(ADXL345_REG_POWER_CTL, 1 << 3)
 
 
 def main():
     print("Hello World!")
     adxl345_dev = adxl345(ADXL345_ADDR)
-    print(adxl345_dev.read_device_id())
+    print("devid:", adxl345_dev.read_device_id())
     adxl345_dev.start_measure()
 
     while True:
-        print(adxl345_dev.read_thresh_tap())
-        time.sleep_ms(200)
-        break
+        # print("int source:", adxl345_dev.read_int_source())
+        # print("fifo status:", adxl345_dev.i2c_read(ADXL345_REG_FIFO_STATUS))
+        # time.sleep(5)
+        x = adxl345_dev.read_data_x()
+        y = adxl345_dev.read_data_y()
+        z = adxl345_dev.read_data_z()
+        print("{},{},{}".format(x, y, z))
 
 
 if __name__ == "__main__":
