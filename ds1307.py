@@ -18,7 +18,8 @@ DS1307_REG_DATE = 0x04
 DS1307_REG_MONTH = 0x05
 DS1307_REG_YEAR = 0x06
 DS1307_REG_CONTROL = 0x07
-# RAM 56 x 8
+
+# RAM 56 Bytes
 DS1307_REG_RAM_00 = 0x08
 DS1307_REG_RAM_55 = 0x3F
 
@@ -46,6 +47,14 @@ class i2c_ifce(object):
 
     def read_byte(self, addr):
         return self.i2c.readfrom(addr, 1)
+
+    """
+    Complex ops
+    """
+    def read_byte_len(self, addr, byte, length):
+        # TODO
+        # return self.i2c.readfrom_mem_into(addr, byte, buf)
+        pass
 
     def i2c_scan(self):
         return self.i2c.scan()
@@ -83,6 +92,9 @@ class ds1307(i2c_ifce):
         print(reg_list)
         return reg_list
 
+    def burst_read(self):
+        return super().read_byte_len(self.dev_addr, DS1307_REG_RAM_00, 56)
+
 spi = machine.SPI(
     0,
     baudrate=50_000_000,
@@ -93,6 +105,13 @@ spi = machine.SPI(
 )
 
 def main():
+    machine.freq(240000000)  # set the CPU frequency to 240 MHz
+    print(machine.freq())
+    i2c = i2c_ifce()
+    print(i2c.i2c_scan())
+
+    ds1307_dev = ds1307(0x68)
+    
     # lcd = St7735(rot=3, res=(128, 160),
     #              spi=spi, cs=13, dc=14, bl=12, rst=15,
     #              model='blacktab')
@@ -106,14 +125,25 @@ def main():
     #
     # # Load the screen
     # lv.scr_load(scr)
-    i2c = i2c_ifce()
-    print(i2c.i2c_scan())
 
-    ds1307_dev = ds1307(0x68)
+    def update_ds1307(t):
+        # print(ds1307_dev.i2c_read(DS1307_REG_SECONDS))
+        # ram = ds1307_dev.dump_ram()
+        # second = ram[0]
+        # minute = ram[1]
+        # hour = ram[2]
+        # label.set_text(f"{hour}:{minute}:{second}")
+
+        ram = ds1307_dev.dump_ram()
+        print(ram)
+        pass
+
     while True:
-        print(ds1307_dev.i2c_read(DS1307_REG_SECONDS))
-        # ds1307_dev.dump_ram()
+        update_ds1307(t=None)
         time.sleep_ms(1000)
+    # timer = Timer()
+    # timer.init(mode=Timer.PERIODIC, period=1000, callback=update_ds1307)
+
 
 if __name__ == "__main__":
     main()
