@@ -9,6 +9,12 @@ SSD1681_PIN_DC = 14
 SSD1681_PIN_CS = 13
 SSD1681_PIN_BUSY = 12
 
+SSD1681_BLACK = True
+SSD1681_WHITE = False
+
+SSD1681_UPDATE_MODE_PART = 0
+SSD1681_UPDATE_MODE_FULL = 1
+
 
 class spi_ifce(object):
     def __init__(self, speed=400000, sck=18, mosi=19, miso=16, csPin=13):
@@ -162,24 +168,52 @@ class ssd1681(spi_ifce):
         self.write_data(0x00)
         self.wait_for_busy()
 
-    def update(self):
+    def update(self, update_mode: int = SSD1681_UPDATE_MODE_FULL):
         self.write_reg(0x22)
-        self.write_data(0xf7)
+        if update_mode == SSD1681_UPDATE_MODE_FULL:
+            self.write_data(0xf7)
+        elif update_mode == SSD1681_UPDATE_MODE_PART:
+            self.write_data(0xff)
+        else:
+            print("""given update mode is incompatible,
+                    using default update mode: SSD1681_UPDATE_MODE_FULL""")
+            self.write_data(0xf7)
         self.write_reg(0x20)
         self.wait_for_busy()
 
+    def clear(self):
+        self.write_reg(0x24)
+        for i in range(200 * 25):
+            self.write_data(0xff)
+        self.update()
+
+    # TODO: need a logic to decide to use full or part update
     def flush(self):
         self.write_reg(0x24)
         for i in range(200 * 25):
             self.write_data(self.fb[i])
         self.update()
 
-    def draw_pixel(self, x, y, color):
+    def draw_pixel(self, x, y, color: bool):
+        """
+        This function used to draw a single pixel on
+        given (x,y) pos with 'color'
+        :param x:       pos on x
+        :param y:       pos on y
+        :param color:   color of this pixel
+        :return:        none
+        """
         if color:
             self.fb[y * 25 + int(x / 8)] &= ~(1 << (7 - x % 8))
         else:
             self.fb[y * 25 + int(x / 8)] |= (1 << (7 - x % 8))
+
+    def draw_rectangle(self, x1, y1, x2, y2, color: bool):
+        for x in range(x1, x2):
+            for y in range(y1, y2):
+                self.draw_pixel(x, y, color)
         pass
+
 
 def main():
     display = ssd1681(
@@ -203,11 +237,24 @@ def main():
     #     display.write_data(0xff)
     # display.update()
 
-    for x in range(50, 100):
-        for y in range(50, 100):
-            display.draw_pixel(x, y, 1)
+    # for x in range(50, 100):
+    #     for y in range(50, 100):
+    #         display.draw_pixel(x, y, 1)
+    display.clear()
+
+    display.draw_rectangle(0, 0, 50, 50, SSD1681_BLACK)
+    display.draw_rectangle(50, 50, 100, 100, SSD1681_BLACK)
+    display.draw_rectangle(100, 100, 150, 150, SSD1681_BLACK)
+    display.draw_rectangle(150, 150, 200, 200, SSD1681_BLACK)
+
+    display.draw_rectangle(100, 0, 150, 50, SSD1681_BLACK)
+    display.draw_rectangle(150, 50, 200, 100, SSD1681_BLACK)
+
+    display.draw_rectangle(0, 100, 50, 150, SSD1681_BLACK)
+    display.draw_rectangle(50, 150, 100, 200, SSD1681_BLACK)
 
     display.flush()
+
 
 if __name__ == '__main__':
     main()
