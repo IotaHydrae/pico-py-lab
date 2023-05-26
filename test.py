@@ -16,3 +16,23 @@ for i in range(len(epd_3in52_lut_r20_gc)):
     # print(i)
     # print(epd_3in52_lut_r20_gc[i], end=' ')
     pass
+
+def write_reg(*opts):
+    print(opts[0])
+    if len(opts) == 1:
+        print("len = 1")
+        return
+
+    opts = opts[1:]
+    for val in opts:
+        print(val)
+
+write_reg(0x19)
+
+g_framebuffer = [0xff]*12840
+
+print(len(g_framebuffer))
+
+from imagedata import GDEY037T03_gImage_1
+
+print(len(GDEY037T03_gImage_1))
