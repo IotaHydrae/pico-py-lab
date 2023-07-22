@@ -6,13 +6,13 @@ from machine import Pin, SPI
 EPD_HOR_RES = 240
 EPD_VER_RES = 240
 
-EPD_BUF_LEN = EPD_HOR_RES
+# EPD_BUF_LEN = EPD_HOR_RES
 
-g_tx_buf = [0xffff] * 240
+g_tx_buf = [0xffff] * 240 * 10
 
 class ssd1327(object):
     def __init__(self):
-        self.spi = SPI(0, baudrate=12000000, sck=Pin(18), mosi=Pin(19))
+        self.spi = SPI(0, baudrate=50000000, sck=Pin(18), mosi=Pin(19))
         self.rst = Pin(15, mode=Pin.OUT, value=1)
         self.dc = Pin(14, mode=Pin.OUT, value=1)
         self.cs = Pin(13, mode=Pin.OUT, value=1)
@@ -155,6 +155,23 @@ class ssd1327(object):
         self.write_data(y & 0xff)
         self.write_data(0x00)
         self.write_data(0xef)
+        
+        self.write_cmd(0x2c)
+
+    def set_window(self, xs, xe, ys, ye):
+        self.write_cmd(0x2a)
+        self.write_data(0x00)
+        self.write_data(xs & 0xff)
+        self.write_data(0x00)
+        self.write_data(xe & 0xff)
+
+        self.write_cmd(0x2B)
+        self.write_data(0x00)
+        self.write_data(ys & 0xff)
+        self.write_data(0x00)
+        self.write_data(ye & 0xff)
+
+        self.write_cmd(0x2c)
 
     def reset(self):
         self.rst.high()
@@ -165,18 +182,16 @@ class ssd1327(object):
 
     def put_pixel(self, x, y, color):
         self.set_cursor(x, y)
-        self.write_cmd(0x2c)
         self.write_data(color >> 8)
         self.write_data(color & 0xff)
 
     def clear(self):
         # prepare buffer
         for i in range(len(g_tx_buf)):
-            g_tx_buf[i] = 0x00
+            g_tx_buf[i] = 0xff
         self.set_cursor(0, 0)
-        self.write_cmd(0x2c)
 
-        for i in range(EPD_HOR_RES * EPD_VER_RES / 240 * 2):
+        for i in range(EPD_HOR_RES * EPD_VER_RES / 240 / 10 * 2):
             self.write_data_buffered(g_tx_buf)
 
 if __name__ == "__main__":
@@ -190,7 +205,22 @@ if __name__ == "__main__":
     dev.clear()
 
     print("drawing test...")
-    for x in range(120):
-            dev.put_pixel(x, x, 0xffff)
+    # for x in range(240):
+    #         dev.put_pixel(x, x, 0xfd2c)
 
+    # for x in range(240):
+    #     for y in range(240):
+    #         dev.put_pixel(x, y, 0xf12c)
+
+    dev.set_cursor(0, 0)
+    for i in range(240 * 240):
+        dev.write_data(0xfd)
+        dev.write_data(0x2c)
+
+    dev.set_cursor(0, 0)
+    for x in range(240):
+            dev.put_pixel(x, x - 1, 0xf800)
+            dev.put_pixel(x, x, 0xf800)
+            dev.put_pixel(x, x+1, 0xf800)
+    
     print("done.")
