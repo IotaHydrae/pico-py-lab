@@ -2,12 +2,12 @@ import time
 
 from machine import SPI, Pin
 
-SSD1681_PIN_SCL = 10
-SSD1681_PIN_SDA = 11
-SSD1681_PIN_RES = 6
-SSD1681_PIN_DC = 7
-SSD1681_PIN_CS = 9
-SSD1681_PIN_BUSY = 3
+SSD1681_PIN_SCL = 18
+SSD1681_PIN_SDA = 19
+SSD1681_PIN_RES = 15
+SSD1681_PIN_DC = 14
+SSD1681_PIN_CS = 13
+SSD1681_PIN_BUSY = 12
 
 SSD1681_BLACK = True
 SSD1681_WHITE = False
@@ -18,16 +18,12 @@ SSD1681_UPDATE_MODE_FULL = 1
 
 class spi_ifce(object):
     def __init__(self, speed=1000000, sck=10, mosi=11, miso=8, csPin=9):
-        self.speed = speed
-        self.sck = sck
-        self.mosi = mosi
-        self.miso = miso
-        self.csPin = csPin
-
-        self.spi = SPI(1, baudrate=1000000, sck=Pin(10), mosi=Pin(11), miso=Pin(8))
-
-        self.cs = Pin(self.csPin, mode=Pin.OUT, value=1)
-
+        self.spi = SPI(0, baudrate=12000000, sck=Pin(18), mosi=Pin(19))
+        self.rst = Pin(15, mode=Pin.OUT, value=1)
+        self.dc = Pin(14, mode=Pin.OUT, value=1)
+        self.cs = Pin(13, mode=Pin.OUT, value=1)
+        self.busy = Pin(12, mode=Pin.OUT, value=1)
+        
     def cs_select(self):
         self.cs.value(0)
 
