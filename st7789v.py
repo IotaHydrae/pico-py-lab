@@ -10,7 +10,7 @@ EPD_VER_RES = 240
 
 g_tx_buf = [0xffff] * 240 * 10
 
-class ssd1327(object):
+class st7789v(object):
     def __init__(self):
         self.spi = SPI(0, baudrate=50000000, sck=Pin(18), mosi=Pin(19))
         self.rst = Pin(15, mode=Pin.OUT, value=1)
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     machine.freq(240000000)  # set the CPU frequency to 240 MHz
     print("CPU freq : ", machine.freq() / 1000000, "MHz")
 
-    dev = ssd1327()
+    dev = st7789v()
     dev.init_display()
 
     print("cleaning screen ...")

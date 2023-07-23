@@ -10,7 +10,7 @@ EPD_BUF_LEN = EPD_HOR_RES
 
 g_tx_buf = [0x0] * 128
 
-class ssd1327(object):
+class st7735s(object):
     def __init__(self):
         self.spi = SPI(0, baudrate=12000000, sck=Pin(18), mosi=Pin(19))
         self.rst = Pin(15, mode=Pin.OUT, value=1)
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     machine.freq(240000000)  # set the CPU frequency to 240 MHz
     print("CPU freq : ", machine.freq() / 1000000, "MHz")
 
-    dev = ssd1327()
+    dev = st7735s()
     dev.init_display()
 
     print("cleaning screen ...")
