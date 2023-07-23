@@ -15,10 +15,9 @@ SSD1681_WHITE = False
 SSD1681_UPDATE_MODE_PART = 0
 SSD1681_UPDATE_MODE_FULL = 1
 
-
 class spi_ifce(object):
-    def __init__(self, speed=1000000, sck=10, mosi=11, miso=8, csPin=9):
-        self.spi = SPI(0, baudrate=12000000, sck=Pin(18), mosi=Pin(19))
+    def __init__(self, speed=50000000, sck=10, mosi=11, miso=8, csPin=9):
+        self.spi = SPI(0, baudrate=50000000, sck=Pin(18), mosi=Pin(19))
         self.rst = Pin(15, mode=Pin.OUT, value=1)
         self.dc = Pin(14, mode=Pin.OUT, value=1)
         self.cs = Pin(13, mode=Pin.OUT, value=1)
@@ -67,8 +66,12 @@ class ssd1681(spi_ifce):
         self.busy = Pin(self.busyPin, mode=Pin.IN)
 
         self.fb = list(range(200 * 25))
+        self.old_fb = list(range(200 * 25))
         for i in self.fb:
             self.fb[i] = 0xff
+
+        self.refresh_count = 0
+        self.update_func = None
 
     def res_set(self):
         self.res.value(1)
@@ -101,7 +104,7 @@ class ssd1681(spi_ifce):
         return wrapper
 
     # @dc_cmd
-    def write_reg(self, reg):
+    def write_cmd(self, reg):
         # print("reg :", reg)
         self.dc_clr()
         super().write_byte(reg)
@@ -113,6 +116,19 @@ class ssd1681(spi_ifce):
         self.dc_set()
         super().write_byte(val)
         self.dc_clr()
+
+    def write_reg(self, *opts):
+        reg = opts[0]
+        print("reg: ", hex(reg))
+        self.write_cmd(reg)
+
+        if len(opts) == 1:
+            return
+
+        opts = opts[1:]
+        for val in opts:
+            print("val: ", hex(val))
+            self.write_data(val)
 
     def wait_for_busy(self):
         # print("wait for busy...")
@@ -127,42 +143,87 @@ class ssd1681(spi_ifce):
         time.sleep_ms(20)
         self.wait_for_busy()
 
-        self.write_reg(0x12)  # Software reset
+        self.write_cmd(0x12)  # Software reset
         self.wait_for_busy()
 
-        self.write_reg(0x01)
+        self.write_cmd(0x01)
         self.write_data(0xC7)
         self.write_data(0x00)
         self.write_data(0x01)
 
-        self.write_reg(0x11)
+        self.write_cmd(0x11)
         self.write_data(0x01)
 
-        self.write_reg(0x44)
+        self.write_cmd(0x44)
         self.write_data(0x00)
         self.write_data(0x18)  # 0x0F -->(15 + 1) * 8 = 128
 
-        self.write_reg(0x45)
+        self.write_cmd(0x45)
         self.write_data(0xC7)  # 0xF9 -->(249 + 1) = 250
         self.write_data(0x00)
         self.write_data(0x00)
         self.write_data(0x00)
 
-        self.write_reg(0x3C)
+        self.write_cmd(0x3C)
         self.write_data(0x05)
 
-        self.write_reg(0x18)  # Read built-in temperature sensor
+        self.write_cmd(0x18)  # Read built-in temperature sensor
         self.write_data(0x80)
 
-        self.write_reg(0x4E)  # set RAM x address count to 0;
+        self.write_cmd(0x4E)  # set RAM x address count to 0;
         self.write_data(0x00)
         self.write_data(0x4F)  # set RAM y address count to 0X199;
         self.write_data(0xC7)
         self.write_data(0x00)
         self.wait_for_busy()
 
+    def set_window(self, xs, ys, xe, ye):
+        self.write_cmd(0x44)
+        self.write_data(xs & 0xff)
+        self.write_data(xe & 0xff)
+
+        self.write_cmd(0x45)
+        self.write_data(ys & 0xff)
+        self.write_data((ys >> 8) & 0xff)
+        self.write_data(ye & 0xff)
+        self.write_data((ye >> 8) & 0xff)
+
+    def set_cursor(self, x, y):
+        self.write_cmd(0x4e)
+        self.write_data(x & 0xff)
+        self.write_cmd(0x4f)
+        self.write_data(y & 0xff)
+        self.write_data((y >> 8) & 0xff)
+
+    def deep_sleep(self):
+        self.write_cmd(0x10)
+        self.write_data(0x01)
+        time.sleep_ms(100)
+
+
+    def update_part(self):
+        self.write_cmd(0x22)
+        self.write_data(0xff)
+        self.write_cmd(0x20)
+        self.wait_for_busy()
+        return 0
+
+    def update_full(self):
+        self.write_cmd(0x22)
+        self.write_data(0xf7)
+        self.write_cmd(0x20)
+        self.wait_for_busy()
+        return 0
+
+    def update_fast(self):
+        self.write_cmd(0x22)
+        self.write_data(0xc7)
+        self.write_cmd(0x20)
+        self.wait_for_busy()
+        return 0
+
     def update(self, update_mode: int = SSD1681_UPDATE_MODE_FULL):
-        self.write_reg(0x22)
+        self.write_cmd(0x22)
         if update_mode == SSD1681_UPDATE_MODE_FULL:
             self.write_data(0xf7)
         elif update_mode == SSD1681_UPDATE_MODE_PART:
@@ -171,21 +232,62 @@ class ssd1681(spi_ifce):
             print("""given update mode is incompatible,
                     using default update mode: SSD1681_UPDATE_MODE_FULL""")
             self.write_data(0xf7)
-        self.write_reg(0x20)
+        self.write_cmd(0x20)
         self.wait_for_busy()
 
+    def reset(self):
+        self.res_set()
+        self.res_clr()
+        time.sleep_ms(2)
+        self.res_set()
+
     def clear(self):
-        self.write_reg(0x24)
+        self.write_cmd(0x24)
         for i in range(200 * 25):
             self.write_data(0xff)
-        self.update()
+        self.update(update_mode=SSD1681_UPDATE_MODE_PART)
 
-    # TODO: need a logic to decide to use full or part update
     def flush(self):
-        self.write_reg(0x24)
+        self.update_func = self.update_full
+        diff = 0
+
+        self.reset()
+        self.write_cmd(0x3c)
+        self.write_data(0x80)
+
+        self.write_cmd(0x44)
+        self.write_data(0x00)
+        self.write_data(0x18)
+
+        self.write_cmd(0x45)
+        self.write_data(0xc7)
+        self.write_data(0x00)
+        self.write_data(0x00)
+        self.write_data(0x00)
+
+        self.write_cmd(0x24)
         for i in range(200 * 25):
+            if self.fb[i] != self.old_fb[i]:
+                diff+=1
             self.write_data(self.fb[i])
-        self.update()
+
+        if diff == 0:
+            return
+
+        if diff < (200 * 25 / 3):
+            self.update_func = self.update_part
+        else:
+            self.update_func = self.update_full
+
+        self.refresh_count+=1
+
+        if (self.refresh_count % 5) == 0:
+            self.update_func = self.update_full
+
+        self.update_func()
+
+        for i in range(200 * 25):
+            self.old_fb[i] = self.fb[i]
 
     def draw_pixel(self, x, y, color: bool):
         """
@@ -196,6 +298,9 @@ class ssd1681(spi_ifce):
         :param color:   color of this pixel
         :return:        none
         """
+        if x < 0 or x >= 200 or y < 0 or y >= 200:
+            return
+
         if color:
             self.fb[y * 25 + int(x / 8)] &= ~(1 << (7 - x % 8))
         else:
@@ -209,6 +314,9 @@ class ssd1681(spi_ifce):
 
 
 def main():
+    machine.freq(240000000)  # set the CPU frequency to 240 MHz
+    print("CPU freq : ", machine.freq() / 1000000, "MHz")
+
     display = ssd1681(
         sck=SSD1681_PIN_SCL,
         mosi=SSD1681_PIN_SDA,
@@ -220,28 +328,33 @@ def main():
 
     display.device_init()
 
-    # display.write_reg(0x24)
-    # for i in range(200 * 25):
-    #     display.write_data(0x00)
-    # display.update()
-    #
-    # display.write_reg(0x24)
-    # for i in range(200 * 25):
-    #     display.write_data(0xff)
-    # display.update()
+    display.write_cmd(0x24)
+    for i in range(200 * 25):
+        display.write_data(0x00)
+    # display.update(update_mode=SSD1681_UPDATE_MODE_PART)
+    display.update_part()
 
-    # for x in range(50, 100):
-    #     for y in range(50, 100):
-    #         display.draw_pixel(x, y, 1)
-    display.clear()
+    display.write_cmd(0x24)
+    for i in range(200 * 25):
+        display.write_data(0xff)
+    # display.update(update_mode=SSD1681_UPDATE_MODE_PART)
+    display.update_part()
+
+    for x in range(200):
+            display.draw_pixel(x, x - 1, 1)
+            display.draw_pixel(x, x, 1)
+            display.draw_pixel(x, x + 1, 1)
+    display.flush()
 
     display.draw_rectangle(0, 0, 50, 50, SSD1681_BLACK)
     display.draw_rectangle(50, 50, 100, 100, SSD1681_BLACK)
     display.draw_rectangle(100, 100, 150, 150, SSD1681_BLACK)
     display.draw_rectangle(150, 150, 200, 200, SSD1681_BLACK)
+    display.flush()
 
     display.draw_rectangle(100, 0, 150, 50, SSD1681_BLACK)
     display.draw_rectangle(150, 50, 200, 100, SSD1681_BLACK)
+    display.flush()
 
     display.draw_rectangle(0, 100, 50, 150, SSD1681_BLACK)
     display.draw_rectangle(50, 150, 100, 200, SSD1681_BLACK)
