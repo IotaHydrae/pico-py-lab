@@ -8,7 +8,7 @@
 #
 #        SDL.init(auto_refresh=False)
 #        # Register SDL display driver.
-#        # Regsiter SDL mouse driver
+#        # Register SDL mouse driver
 #        event_loop = lv_utils.event_loop()
 #
 #
@@ -16,7 +16,7 @@
 #
 #        SDL.init(auto_refresh=False)
 #        # Register SDL display driver.
-#        # Regsiter SDL mouse driver
+#        # Register SDL mouse driver
 #        event_loop = lv_utils.event_loop(asynchronous=True)
 #        uasyncio.Loop.run_forever()
 #
@@ -120,8 +120,9 @@ class event_loop():
 
     def task_handler(self, _):
         try:
-            lv.task_handler()
-            if self.refresh_cb: self.refresh_cb()
+            if lv._nesting.value == 0:
+                lv.task_handler()
+                if self.refresh_cb: self.refresh_cb()
             self.scheduled -= 1
         except Exception as e:
             if self.exception_sink:
@@ -141,13 +142,14 @@ class event_loop():
     async def async_refresh(self):
         while True:
             await self.refresh_event.wait()
-            self.refresh_event.clear()
-            try:
-                lv.task_handler()
-            except Exception as e:
-                if self.exception_sink:
-                    self.exception_sink(e)
-            if self.refresh_cb: self.refresh_cb()
+            if lv._nesting.value == 0:
+                self.refresh_event.clear()
+                try:
+                    lv.task_handler()
+                except Exception as e:
+                    if self.exception_sink:
+                        self.exception_sink(e)
+                if self.refresh_cb: self.refresh_cb()
 
     async def async_timer(self):
         while True:
