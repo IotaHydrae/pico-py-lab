@@ -43,6 +43,8 @@ if not lv_utils.event_loop.is_running():
     drv = driver()
     drv.init_gui()
 
+############################################################################################
+
 scr = lv.obj()
 btn = lv.button(scr)
 btn.align(lv.ALIGN.CENTER, 0, 0)
