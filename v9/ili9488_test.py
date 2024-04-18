@@ -1,4 +1,5 @@
 # init
+import machine
 
 import usys as sys
 sys.path.append('') # See: https://github.com/micropython/micropython/issues/6419
@@ -9,6 +10,10 @@ import lv_utils
 lv.init()
 
 class driver:
+    def __init__(self):
+        machine.freq(240000000)  # set the CPU frequency to 240 MHz
+        print("CPU freq : ", machine.freq() / 1000000, "MHz")
+
     def init_gui(self):
         import ili9488 as tft
         import ft6236 as tp

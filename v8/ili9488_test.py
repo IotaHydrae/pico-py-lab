@@ -1,4 +1,5 @@
 # init
+import machine
 
 import usys as sys
 sys.path.append('') # See: https://github.com/micropython/micropython/issues/6419
@@ -9,6 +10,10 @@ import lv_utils
 lv.init()
 
 class driver:
+    def __init__(self):
+        machine.freq(240000000)  # set the CPU frequency to 240 MHz
+        print("CPU freq : ", machine.freq() / 1000000, "MHz")
+
     def init_gui(self):
         import ili9488 as tft
         import ft6236 as tp
@@ -49,14 +54,42 @@ if not lv_utils.event_loop.is_running():
 
 ############################################################################################
 
-scr = lv.obj()
-btn = lv.btn(scr)
-btn.align(lv.ALIGN.CENTER, 0, 0)
+#
+# Create a 2x2 tile view and allow scrolling only in an "L" shape.
+# Demonstrate scroll chaining with a long list that
+# scrolls the tile view when it cant't be scrolled further.
+#
+tv = lv.tileview(lv.scr_act())
+
+# Tile1: just a label
+tile1 = tv.add_tile(0, 0, lv.DIR.BOTTOM)
+label = lv.label(tile1)
+label.set_text("Scroll down")
+label.center()
+
+# Tile2: a button
+tile2 = tv.add_tile(0, 1, lv.DIR.TOP | lv.DIR.RIGHT)
+
+btn = lv.btn(tile2)
+
 label = lv.label(btn)
-label.set_text('Hello World!')
+label.set_text("Scroll up or right")
 
-lbl = lv.label(scr)
-lbl.set_text("Present by embeddedboys")
-lbl.align(lv.ALIGN.BOTTOM_MID, 0, -20)
+btn.set_size(lv.SIZE.CONTENT, lv.SIZE.CONTENT)
+btn.center()
 
-lv.scr_load(scr)
+# Tile3: a list
+tile3 =  tv.add_tile(1, 1, lv.DIR.LEFT)
+list = lv.list(tile3)
+list.set_size(lv.pct(100), lv.pct(100))
+
+list.add_btn(None, "One")
+list.add_btn(None, "Two")
+list.add_btn(None, "Three")
+list.add_btn(None, "Four")
+list.add_btn(None, "Five")
+list.add_btn(None, "Six")
+list.add_btn(None, "Seven")
+list.add_btn(None, "Eight")
+list.add_btn(None, "Nine")
+list.add_btn(None, "Ten")
