@@ -59,4 +59,9 @@ btn = lv.btn(scr)
 btn.align(lv.ALIGN.CENTER, 0, 0)
 label = lv.label(btn)
 label.set_text('Hello World!')
+
+lbl = lv.label(scr)
+lbl.set_text('Present by embeddedboys!');
+lbl.align(lv.ALIGN.BOTTOM_MID, 0, -20)
+
 lv.scr_load(scr)
