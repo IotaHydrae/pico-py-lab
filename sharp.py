@@ -3,6 +3,13 @@ import time
 import machine
 from machine import Pin, SPI
 
+TFT_PIN_SCK = 18
+TFT_PIN_SDA = 19
+TFT_PIN_MOD = 15
+TFT_PIN_INV = 14
+TFT_PIN_CSX = 13
+TFT_PIN_DISP = 12
+
 BLACK   = 0x00
 RED     = 0x04
 GREEN   = 0x02
@@ -31,11 +38,11 @@ def bitrev8(n):
 
 class LS013B7DH06(object):
     def __init__(self):
-        self.spi = SPI(0, baudrate=(20 * 1000 * 1000), sck=Pin(18), mosi=Pin(19))
-        self.mod = Pin(15, mode=Pin.OUT, value=0)
-        self.inv = Pin(14, mode=Pin.OUT, value=0)
-        self.cs = Pin(13, mode=Pin.OUT, value=0)    # Active high
-        self.disp = Pin(12, mode=Pin.OUT, value=0)   # disp
+        self.spi = SPI(0, baudrate=(20 * 1000 * 1000), sck=Pin(TFT_PIN_SCK), mosi=Pin(TFT_PIN_SDA))
+        self.mod = Pin(TFT_PIN_MOD, mode=Pin.OUT, value=0)
+        self.inv = Pin(TFT_PIN_INV, mode=Pin.OUT, value=0)
+        self.cs = Pin(TFT_PIN_CSX, mode=Pin.OUT, value=0)    # Active high
+        self.disp = Pin(TFT_PIN_DISP, mode=Pin.OUT, value=0)   # disp
         self.width = 128
         self.height = 128
         self.line_width = self.width * 3 / 8
@@ -113,6 +120,14 @@ if __name__ == "__main__":
     lcd.clear()
 
     print("Framebuffer size:", len(lcd.framebuffer), "bytes")
+
+    for x in range(128):
+        lcd.set_pixel(x, x, BLACK)
+
+    for x in range(128, -1, -1):
+        lcd.set_pixel(x, 128 - x, BLACK)
+
+    lcd.refresh()
 
     while True:
         for color in SUPPORTED_COLORS:
